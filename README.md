@@ -10,6 +10,8 @@
   - nsml run은 파일을 업로드하여 가상 서버에서 진행. 
   - 올라가면 안 되는 파일의 경우 .nsmlignore에 추가하여 업로드하지 않을 수 있다.
   - .gitignore rule과 동일
+- [nsml.py](./nsml.py)
+  - nsml baseline에 맞는 server-side nsml package 구현체
 - 기타 python 관련 파일 자유롭게 추가 가능
 
 ## About NSML
