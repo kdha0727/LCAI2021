@@ -12,10 +12,7 @@ setup(
         'torch',
         'scikit-learn',
         'imblearn',
-        'pytorch-tabnet',
-        'xgboost',
         'smote_variants',
-        'lightgbm',
     ]
 )
 
