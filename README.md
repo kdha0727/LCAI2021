@@ -4,6 +4,7 @@
 
 - [main.py](./main.py)
   - train / inference 수행할 메인 코드
+  - baseline의 경우 tabular data binary classification에 대한 pytorch logistic regression 예시
 - [setup.py](./setup.py)
   - nsml docker configuration
 - [.nsmlignore](./.nsmlignore)
