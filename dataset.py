@@ -13,7 +13,7 @@ def to_rgb(image):
     return rgb_image
 
 class ImageDataset(Dataset):
-    def __init__(self, root, input_shape, mode='train', target=2):
+    def __init__(self, root, input_shape, mode='train', type='normal', target=2):
 
         if mode == 'train':
             self.transform = A.Compose(
@@ -38,10 +38,11 @@ class ImageDataset(Dataset):
         unaligned = False
         self.unaligned = unaligned
         self.mode = mode
+        self.type = type
         self.target = target
         self.input_shape = input_shape
-        self.files_A = sorted(glob.glob(os.path.join(root, f"{self.mode}A") + "/*.*"))
-        self.files_B = sorted(glob.glob(os.path.join(root, f"{self.mode}B") + "/*.*"))
+        self.files_A = sorted(glob.glob(os.path.join(root, f"{self.mode}/{self.type}/image") + "/*.*"))
+        self.files_B = sorted(glob.glob(os.path.join(root, f"{self.mode}/{self.type}/mask") + "/*.*"))
         # self.aug_func = transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=0.1)
 
     def __getitem__(self, index):

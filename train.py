@@ -3,7 +3,8 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 import sys
-from model import ResNetUNet
+# from model import ResNetUNet
+from monai.networks.nets import UNet
 import pytorch_ssim
 
 from dataset import ImageDataset
@@ -39,25 +40,21 @@ class UnNormalize(object):
         return tensor
 
 def main(args):
-    inv_transform = transforms.Compose(
-        [
-            UnNormalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-            transforms.ToPILImage(),
-        ]
-    )
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     input_shape = (args.n_channel, args.img_height, args.img_width)
-    dataset = ImageDataset(args.data_path , input_shape, mode='train')
-    train_loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=24, pin_memory=True,shuffle=True)
+    dataset = ImageDataset(args.data_path , input_shape, mode='train', type='normal')
+    train_loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=24, pin_memory=True, shuffle=True)
 
-    dataset = ImageDataset(args.data_path, input_shape, mode='test')
+    dataset = ImageDataset(args.data_path, input_shape, mode='test', type='normal')
     test_loader=DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=24)
 
-    model = ResNetUNet()
+    model = UNet(spatial_dims=2, in_channels=3, out_channels=3,
+                 channels=(4, 8, 16, 32, 64), strides=(2, 2, 2, 2), num_res_units=2)
     criterian=pytorch_ssim.ssim
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.LR)
-    min_test_loss = 100000
+    min_test_loss = 1e5
+
     print("starting training in",device)
     for j in range(args.epoch):
         show=True
@@ -91,17 +88,20 @@ def main(args):
 
             outputs = model(input)
 
-            loss_test = 1.-criterian(mask , outputs)
+            loss_test = 1. - criterian(mask , outputs)
             cumulative_loss += loss_test.item()
 
         avg_loss = cumulative_loss / len(test_loader)
+
         print('Average test loss after %d epoch is %f ' % ((j + 1, avg_loss)))
+
         if avg_loss < min_test_loss:
             if os.path.exists('model-laryngeal1_' + str(min_test_loss) + '.pth.tar'):
                 os.remove('model-laryngeal1_' + str(min_test_loss) + '.pth.tar')
             torch.save(model.state_dict(), 'model-laryngeal1_' + str(avg_loss) + '.pth.tar')
             print("average loss decresed ......saving model")
             min_test_loss = avg_loss
+
         print("minimum average loss till now is %f"%(min_test_loss))
 
 
