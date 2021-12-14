@@ -88,11 +88,11 @@ class TrainDataset(ImageFolder):  # train / val
         mask_background = np.zeros((mask_load.shape[0], mask_load.shape[1]), np.uint8)
         mask = np.zeros((mask_load.shape[0], mask_load.shape[1], 8), np.uint8)
         mask[:, :, :7] = mask_load
-        mask_background[mask_load.sum(axis=3) == 0] = 1
+        mask_background[mask_load.sum(axis=2) == 0] = 1
         mask[:, :, 7] = mask_background
         augmented = self.transform(image=image, mask=mask)
-        image = Image.fromarray(augmented['image'])
-        mask = Image.fromarray(augmented['mask'])
+        image = augmented['image']
+        mask = augmented['mask'].permute(2, 0, 1)
         return image, mask, target
 
     def __len__(self):

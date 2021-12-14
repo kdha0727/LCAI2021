@@ -84,7 +84,7 @@ def main(args):
             optimizer.zero_grad()
             outputs = model(input)
 
-            loss = criterion(mask, outputs)
+            loss = criterion(outputs, mask)
             print('iteration  == %d  epoch  == %d   loss  == %f ' % (i + 1, j + 1, loss))
             cumulative_loss += loss.item()
             loss.backward()
@@ -103,7 +103,7 @@ def main(args):
 
             outputs = model(input)
 
-            loss_test = criterion(mask, outputs)
+            loss_test = criterion(outputs, mask)
             cumulative_loss += loss_test.item()
 
         avg_loss = cumulative_loss / len(test_loader)
