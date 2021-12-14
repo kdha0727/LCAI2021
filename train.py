@@ -12,17 +12,16 @@ from model.losses import BCEDiceIoUWithLogitsLoss2d
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_data_path', type=str, default="train_set/"
-                        , help='path to the train data folder')
-    parser.add_argument('--test_data_path', type=str, default="test_set_for_LCAI/"
-                        , help='path to the test data folder')
+    parser.add_argument('--data_path', type=str, default="train_set/", help='path to the train data folder')
+    parser.add_argument('--mode', type=str, default='train', help='mode')
     parser.add_argument('--batch_size', type=int, default=24, help='batch size')
     parser.add_argument('--epoch', type=int, default=500, help='no. of epoch')
-    parser.add_argument('--LR', type=float, default=0.00001, help='learning rate')
+    # parser.add_argument('--LR', type=float, default=0.00001, help='learning rate')
+    parser.add_argument('--LR', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--n_channel', type=int, default=3, help='input channel')
     parser.add_argument('--img_height', type=int, default=256, help='image height')
     parser.add_argument('--img_width', type=int, default=384, help='image width')
-    parser.add_argument('--n_class', type=int, default=8, help='input channel')
+    parser.add_argument('--n_class', type=int, default=8, help='output classes')
     parser.add_argument('--split_ratio', type=float, default=0.8, help='train/val split ratio')
     parser.add_argument('--num_workers', type=int, default=12, help='number of data loader workers')
     return parser.parse_args(argv)
@@ -50,7 +49,7 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     input_shape = (args.n_channel, args.img_height, args.img_width)
     split_ratio = args.split_ratio
-    dataset = TrainDataset(args.train_data_path, input_shape)
+    dataset = TrainDataset(args.data_path, input_shape)
     tds, vds = random_split(
         dataset,
         (int(len(dataset) * split_ratio), len(dataset) - int(len(dataset) * split_ratio))
@@ -61,7 +60,7 @@ def main(args):
         tds, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True)
     test_loader = DataLoader(
         vds, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=True)
-    # dataset = TestDataset(args.test_data_path, input_shape)
+    # dataset = TestDataset(args.data_path, input_shape)
 
     model = UNet(spatial_dims=2, in_channels=args.n_channel, out_channels=args.n_class,
                  channels=(4, 8, 16, 32, 64), strides=(2, 2, 2, 2), num_res_units=2)
