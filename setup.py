@@ -7,12 +7,14 @@ setup(
     name='nia dm hackathon example',
     version='1.0',
     install_requires=[
+        'pillow',
         'pandas',
         'numpy',
         'torch',
         'scikit-learn',
-        'imblearn',
-        'smote_variants',
+        'opencv-python',
+        # 'imblearn',
+        # 'smote_variants',
     ]
 )
 

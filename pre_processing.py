@@ -1,11 +1,27 @@
 import os
-import xml.etree.ElementTree as ET
 import numpy as np
 import cv2
+from PIL import ImageColor, Image
+from xml.etree import ElementTree
 
 import argparse
 import sys
-from PIL import ImageColor, Image
+
+
+# BT: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255), (255, 0, 255)}
+# CA: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255), (255, 0, 0)}  # (56, 142, 60)?
+# NO: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255)}
+
+channel_map = {
+    (255, 255, 0):     0,  # common
+    (0, 255, 255):     1,  # common
+    (64, 0, 255):      2,  # common
+    (64, 255, 0):      3,  # common
+    (0, 128, 255):     4,  # common
+    (255, 0, 255):     5,  # benign_tumor
+    (255, 0, 0):       6,  # cancer
+    (56, 142, 60):     0,  # ????? - cancer/UH0001_CD18_AAAA0016_Laryn_LC_000023_0001
+}
 
 
 def parse_arguments(argv):
@@ -44,27 +60,30 @@ def main(args):
             files.append(file)
 
     for file in files:
-        extension = file.split(".")[-1]
+        # extension = file.split(".")[-1]
         filename = file.split(".")[0]
         print(file)
         if not os.path.exists(destination_folder + "/image"):
             os.makedirs(destination_folder + "/image")
 
-        img_real = Image.open(root_folder+"/"+file)
+        img_real = Image.open(root_folder + "/" + file)
         img_real.load()
         width, height = img_real.size
 
         if not test_mode:
             if not os.path.exists(destination_folder + "/mask"):
                 os.makedirs(destination_folder + "/mask")
-            tree = ET.parse(root_folder+'/'+filename+".xml")
+            if not os.path.exists(destination_folder + "/mask_visualization"):
+                os.makedirs(destination_folder + "/mask_visualization")
+            tree = ElementTree.parse(root_folder + '/' + filename + ".xml")
             root = tree.getroot()
             root_size = root.findall("size")
 
             depth = int(root_size[0].findtext("depth"))
-            mask = np.zeros((height, width, depth), dtype=np.uint8)
-            shapes = root_size = root.findall("object")
-            if shapes == []:
+            mask = np.zeros((height, width, 7), dtype=np.uint8)
+            mask_visualization = np.zeros((height, width, depth), dtype=np.uint8)
+            shapes = root.findall("object")
+            if not shapes:
                 continue
             for shape in shapes:
                 clr = shape.findtext("clr")
@@ -77,21 +96,26 @@ def main(args):
                 r = []
                 for point_x, point_y in zip(data_x, data_y):
                     r.append((int(float(point_x.text)),
-                             int(float(point_y.text))))
+                              int(float(point_y.text))))
 
                 clr = ImageColor.getcolor(clr, "RGB")
+                cur_mask = np.zeros((height, width), dtype=np.uint8)
+                cur_mask = cv2.fillPoly(cur_mask, [np.asarray(r)], (1,), cv2.LINE_AA)
+                cur_channel = channel_map[clr]
+                mask[:, :, cur_channel] = cur_mask
+                for channel in range(7):
+                    if channel != cur_channel:
+                        mask[:, :, channel][mask[:, :, channel] == cur_mask] = 0
+                cv2.fillPoly(mask_visualization, [np.asarray(r)], clr, cv2.LINE_AA)
 
-                cv2.fillPoly(mask, [np.asarray(r)], clr, cv2.LINE_AA)
+            np.save(destination_folder + "/mask/" + filename + ".npy", cv2.resize(mask, (img_width, img_height)))
+            Image.fromarray(cv2.resize(mask_visualization, (img_width, img_height))).save(
+                destination_folder + "/mask_visualization/" + filename + ".png", format="png")
 
-            small_mask = cv2.resize(mask, (img_width, img_height))
-            small_mask = Image.fromarray(small_mask).save(
-                destination_folder+"/mask/"+filename+".png", format="png")
+        small_img_real = cv2.resize(np.asarray(img_real), (img_width, img_height))  # noqa
 
-        small_img_real = cv2.resize(np.asarray(
-            img_real), (img_width, img_height))
-
-        small_img_real = Image.fromarray(small_img_real).save(
-            destination_folder+"/image/"+filename+".png", format="png")
+        Image.fromarray(small_img_real).save(
+            destination_folder + "/image/" + filename + ".png", format="png")
 
 
 if __name__ == "__main__":

@@ -1,26 +1,32 @@
 import os
 import argparse
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import sys
 # from model import ResNetUNet
 from monai.networks.nets import UNet
-import pytorch_ssim
 
-from dataset import ImageDataset
-import torchvision.transforms as transforms
+from dataset import TrainDataset, TestDataset, test_transform
+from model.losses import BCEDiceIoUWithLogitsLoss2d
+
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path',type = str,default="training_data/"
-                        , help='path to the main folder')
-    parser.add_argument('--batch_size',type = int,default=15, help='batch size')
-    parser.add_argument('--epoch',type = int,default=500, help='no. of epoch')
-    parser.add_argument('--LR',type = int,default=0.00001, help='learning rate')
-    parser.add_argument('--n_channel',type = int,default=3, help='input channel')
-    parser.add_argument('--img_height',type = int,default=256, help='image height')
-    parser.add_argument('--img_width',type = int,default=384, help='image width')
+    parser.add_argument('--train_data_path', type=str, default="train_set/"
+                        , help='path to the train data folder')
+    parser.add_argument('--test_data_path', type=str, default="test_set_for_LCAI/"
+                        , help='path to the test data folder')
+    parser.add_argument('--batch_size', type=int, default=24, help='batch size')
+    parser.add_argument('--epoch', type=int, default=500, help='no. of epoch')
+    parser.add_argument('--LR', type=float, default=0.00001, help='learning rate')
+    parser.add_argument('--n_channel', type=int, default=3, help='input channel')
+    parser.add_argument('--img_height', type=int, default=256, help='image height')
+    parser.add_argument('--img_width', type=int, default=384, help='image width')
+    parser.add_argument('--n_class', type=int, default=8, help='input channel')
+    parser.add_argument('--split_ratio', type=float, default=0.8, help='train/val split ratio')
+    parser.add_argument('--num_workers', type=int, default=12, help='number of data loader workers')
     return parser.parse_args(argv)
+
 
 class UnNormalize(object):
     def __init__(self, mean, std):
@@ -39,38 +45,48 @@ class UnNormalize(object):
             # The normalize code -> t.sub_(m).div_(s)
         return tensor
 
+
 def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     input_shape = (args.n_channel, args.img_height, args.img_width)
-    dataset = ImageDataset(args.data_path , input_shape, mode='train', type='normal')
-    train_loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=24, pin_memory=True, shuffle=True)
+    split_ratio = args.split_ratio
+    dataset = TrainDataset(args.train_data_path, input_shape)
+    tds, vds = random_split(
+        dataset,
+        (int(len(dataset) * split_ratio), len(dataset) - int(len(dataset) * split_ratio))
+    )
+    vds.transform = test_transform(input_shape)
 
-    dataset = ImageDataset(args.data_path, input_shape, mode='test', type='normal')
-    test_loader=DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=24)
+    train_loader = DataLoader(
+        tds, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True)
+    test_loader = DataLoader(
+        vds, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=True)
+    # dataset = TestDataset(args.test_data_path, input_shape)
 
-    model = UNet(spatial_dims=2, in_channels=3, out_channels=3,
+    model = UNet(spatial_dims=2, in_channels=args.n_channel, out_channels=args.n_class,
                  channels=(4, 8, 16, 32, 64), strides=(2, 2, 2, 2), num_res_units=2)
-    criterian=pytorch_ssim.ssim
+    criterion = BCEDiceIoUWithLogitsLoss2d()
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.LR)
-    min_test_loss = 1e5
+    # min_test_loss = 1e5
+    min_test_loss = float('inf')
 
-    print("starting training in",device)
+    print("starting training in", device)
     for j in range(args.epoch):
-        show=True
         print("***********************************************")
         print(" ")
         print(" ")
         model.train()
-        cumulative_loss=0.0
-        for i, (input, mask,_) in enumerate(train_loader):
+        criterion.train()
+        cumulative_loss = 0.
+        for i, (input, mask, _) in enumerate(train_loader):
             input = input.to(device)
             mask = mask.to(device).float()
             optimizer.zero_grad()
             outputs = model(input)
 
-            loss = 1.-criterian(mask, outputs)
-            print('iteration  == %d  epoch  == %d   loss  == %f '%(i+1,j+1,loss))
+            loss = criterion(mask, outputs)
+            print('iteration  == %d  epoch  == %d   loss  == %f ' % (i + 1, j + 1, loss))
             cumulative_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -79,16 +95,16 @@ def main(args):
         print('Average loss after %d epoch is %f ' % ((j + 1, avg_loss)))
 
         model.eval()
+        criterion.eval()
         cumulative_loss = 0.0
-        for i, (input, mask,_) in enumerate(test_loader):
-
+        for i, (input, mask, _) in enumerate(test_loader):
             input = input.to(device)
             mask = mask.to(device).float()
             optimizer.zero_grad()
 
             outputs = model(input)
 
-            loss_test = 1. - criterian(mask , outputs)
+            loss_test = criterion(mask, outputs)
             cumulative_loss += loss_test.item()
 
         avg_loss = cumulative_loss / len(test_loader)
@@ -102,10 +118,8 @@ def main(args):
             print("average loss decresed ......saving model")
             min_test_loss = avg_loss
 
-        print("minimum average loss till now is %f"%(min_test_loss))
+        print("minimum average loss till now is %f" % (min_test_loss))
 
 
 if __name__ == "__main__":
     main(parse_arguments(sys.argv[1:]))
-
-
