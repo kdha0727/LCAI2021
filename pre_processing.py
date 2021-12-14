@@ -75,12 +75,15 @@ def main(args):
         if not test_mode:
             if not os.path.exists(destination_folder + "/mask"):
                 os.makedirs(destination_folder + "/mask")
+            if not os.path.exists(destination_folder + "/mask_visualization"):
+                os.makedirs(destination_folder + "/mask_visualization")
             tree = ET.parse(root_folder+'/'+filename+".xml")
             root = tree.getroot()
             root_size = root.findall("size")
 
             depth = int(root_size[0].findtext("depth"))
             mask = np.zeros((height, width, 7), dtype=np.uint8)
+            mask_visualization = np.zeros((height, width, depth), dtype=np.uint8)
             shapes = root_size = root.findall("object")
             if shapes == []:
                 continue
@@ -100,11 +103,11 @@ def main(args):
                 clr = ImageColor.getcolor(clr, "RGB")   
                 cur_mask = np.zeros((height, width), dtype=np.uint8)
                 mask[:, :, channel_map[clr]] = cv2.fillPoly(cur_mask, [np.asarray(r)], (1, ), cv2.LINE_AA)
+                cv2.fillPoly(mask_visualization, [np.asarray(r)], clr, cv2.LINE_AA)
 
-            small_mask = cv2.resize(mask, (img_width, img_height))
-            np.save(destination_folder+"/mask/"+filename+".npy", small_mask)
-#             small_mask = Image.fromarray(small_mask).save(
-#                 destination_folder+"/mask/"+filename+".png", format="png")
+            np.save(destination_folder+"/mask/"+filename+".npy", cv2.resize(mask, (img_width, img_height)))
+            Image.fromarray(cv2.resize(mask_visualization, (img_width, img_height))).save(
+                destination_folder+"/mask_visualization/"+filename+".png", format="png")
 
         small_img_real = cv2.resize(np.asarray(
             img_real), (img_width, img_height))
