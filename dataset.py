@@ -23,7 +23,10 @@ def train_transform(input_shape):
             A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5),
             A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
             A.RandomBrightnessContrast(p=0.5),
-            A.Normalize(),
+            A.Normalize(
+                mean=(130.6546339553507, 84.802248113933, 80.22214275038328),
+                std=(14.45061680166957, 14.68356058416991, 13.664813135860628)
+            ),
             ToTensorV2(),
         ]
     )
@@ -33,7 +36,10 @@ def test_transform(input_shape):
     return A.Compose(
         [
             A.Resize(input_shape[1], input_shape[2]),
-            A.Normalize(),
+            A.Normalize(
+                mean=(130.6546339553507, 84.802248113933, 80.22214275038328),
+                std=(14.45061680166957, 14.68356058416991, 13.664813135860628)
+            ),
             ToTensorV2(),
         ]
     )
