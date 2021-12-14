@@ -102,7 +102,12 @@ def main(args):
 
                 clr = ImageColor.getcolor(clr, "RGB")   
                 cur_mask = np.zeros((height, width), dtype=np.uint8)
-                mask[:, :, channel_map[clr]] = cv2.fillPoly(cur_mask, [np.asarray(r)], (1, ), cv2.LINE_AA)
+                cur_mask = cv2.fillPoly(cur_mask, [np.asarray(r)], (1, ), cv2.LINE_AA)
+                cur_channel = channel_map[clr]
+                mask[:, :, cur_channel] = cur_mask
+                for channel in range(7):
+                    if channel != cur_channel:
+                        mask[:, :, channel][mask[:, :, channel] == cur_mask] = 0
                 cv2.fillPoly(mask_visualization, [np.asarray(r)], clr, cv2.LINE_AA)
 
             np.save(destination_folder+"/mask/"+filename+".npy", cv2.resize(mask, (img_width, img_height)))
