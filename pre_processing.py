@@ -7,6 +7,23 @@ import argparse
 import sys
 from PIL import ImageColor, Image
 
+# +
+# BT: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255), (255, 0, 255)}
+# CA: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255), (255, 0, 0)}  # (56, 142, 60)?
+# NO: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255)}
+
+channel_map = {
+    (255, 255, 0): 0,  # common
+    (0, 255, 255): 1,  # common
+    (64, 0, 255):  2,  # common
+    (64, 255, 0):  3,  # common
+    (0, 128, 255): 4,  # common
+    (255, 0, 255): 5,  # benign_tumor
+    (255, 0, 0):   6,  # cancer
+    (56, 142, 60): 0,  # ????? - cancer/UH0001_CD18_AAAA0016_Laryn_LC_000023_0001
+}
+
+# -
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
@@ -28,6 +45,7 @@ def parse_arguments(argv):
 # destination_folder="processed_data"
 
 def main(args):
+    s = set()
     root_folder = os.path.expanduser(args.root_folder)
     destination_folder = os.path.expanduser(args.destination_folder)
     img_height = args.img_height
@@ -62,7 +80,7 @@ def main(args):
             root_size = root.findall("size")
 
             depth = int(root_size[0].findtext("depth"))
-            mask = np.zeros((height, width, depth), dtype=np.uint8)
+            mask = np.zeros((height, width, 7), dtype=np.uint8)
             shapes = root_size = root.findall("object")
             if shapes == []:
                 continue
@@ -79,19 +97,22 @@ def main(args):
                     r.append((int(float(point_x.text)),
                              int(float(point_y.text))))
 
-                clr = ImageColor.getcolor(clr, "RGB")
-
-                cv2.fillPoly(mask, [np.asarray(r)], clr, cv2.LINE_AA)
+                clr = ImageColor.getcolor(clr, "RGB")   
+                cur_mask = np.zeros((height, width), dtype=np.uint8)
+                mask[:, :, channel_map[clr]] = cv2.fillPoly(cur_mask, [np.asarray(r)], (1, ), cv2.LINE_AA)
 
             small_mask = cv2.resize(mask, (img_width, img_height))
-            small_mask = Image.fromarray(small_mask).save(
-                destination_folder+"/mask/"+filename+".png", format="png")
+            np.save(destination_folder+"/mask/"+filename+".npy", small_mask)
+#             small_mask = Image.fromarray(small_mask).save(
+#                 destination_folder+"/mask/"+filename+".png", format="png")
 
         small_img_real = cv2.resize(np.asarray(
             img_real), (img_width, img_height))
 
         small_img_real = Image.fromarray(small_img_real).save(
             destination_folder+"/image/"+filename+".png", format="png")
+        
+    print(s)
 
 
 if __name__ == "__main__":
