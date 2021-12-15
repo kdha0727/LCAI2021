@@ -20,3 +20,5 @@ class_to_index = {
     'cancer': 2,
 }
 
+img_width = 768
+img_height = 512

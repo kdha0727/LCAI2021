@@ -13,6 +13,8 @@ setup(
         'torch',
         'scikit-learn',
         'opencv-python',
+        'monai',
+        'efficientnet-pytorch',
         # 'imblearn',
         # 'smote_variants',
     ]

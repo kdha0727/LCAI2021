@@ -6,53 +6,37 @@ from torch.utils.data import DataLoader, random_split
 import sys
 # from model import ResNetUNet
 from monai.networks.nets import UNet
-from monai.losses import DiceCELoss, DiceLoss
+from monai.losses import DiceCELoss
 
-from dataset import TrainDataset, TestDataset, test_transform
-from model.losses import BCEDiceIoUWithLogitsLoss2d
+from dataset import TrainDataset, test_transform
 from model.functional import convert_by_one_hot_nd
+
+from constants import class_to_index, img_width, img_height
 
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default="train_set/", help='path to the train data folder')
-    parser.add_argument('--mode', type=str, default='train', help='mode')
-    parser.add_argument('--batch_size', type=int, default=48, help='batch size')
+    parser.add_argument('--target', type=str, default="all", help='class')
+    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--epoch', type=int, default=500, help='no. of epoch')
-    # parser.add_argument('--LR', type=float, default=0.00001, help='learning rate')
     parser.add_argument('--LR', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--n_channel', type=int, default=3, help='input channel')
-    parser.add_argument('--img_height', type=int, default=512, help='image height')
-    parser.add_argument('--img_width', type=int, default=768, help='image width')
     parser.add_argument('--n_class', type=int, default=8, help='output classes')
-    parser.add_argument('--split_ratio', type=float, default=0.8, help='train/val split ratio')
-    parser.add_argument('--num_workers', type=int, default=12, help='number of data loader workers')
+    parser.add_argument('--split_ratio', type=float, default=0.9, help='train/val split ratio')
+    parser.add_argument('--num_workers', type=int, default=8, help='number of data loader workers')
+    parser.add_argument('--device', type=str, default='cuda', help='device type')
     return parser.parse_args(argv)
 
 
-class UnNormalize(object):
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
-
-    def __call__(self, tensor):
-        """
-        Args:
-            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
-        Returns:
-            Tensor: Normalized image.
-        """
-        for t, m, s in zip(tensor, self.mean, self.std):
-            t.mul_(s).add_(m)
-            # The normalize code -> t.sub_(m).div_(s)
-        return tensor
-
-
 def main(args):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    input_shape = (args.n_channel, args.img_height, args.img_width)
+    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    input_shape = (3, img_height, img_width)
     split_ratio = args.split_ratio
-    dataset = TrainDataset(args.data_path, input_shape)
+    if args.target != 'all':
+        class_to_idx = {args.target: class_to_index[args.target]}
+    else:
+        class_to_idx = class_to_index.copy()
+    dataset = TrainDataset(args.data_path, input_shape, class_to_idx)
     tds, vds = random_split(
         dataset,
         (int(len(dataset) * split_ratio), len(dataset) - int(len(dataset) * split_ratio))
@@ -65,12 +49,10 @@ def main(args):
         vds, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=True)
     # dataset = TestDataset(args.data_path, input_shape)
 
-    model = UNet(spatial_dims=2, in_channels=args.n_channel, out_channels=args.n_class,
+    model = UNet(spatial_dims=2, in_channels=3, out_channels=args.n_class,
                  channels=(16, 32, 64, 128, 256), strides=(2, 2, 2, 2), num_res_units=2)
     # criterion = BCEDiceIoUWithLogitsLoss2d()
-    criterion = DiceCELoss(include_background=True, softmax=True,
-        lambda_dice=2.
-    )
+    criterion = DiceCELoss(include_background=True, softmax=True, lambda_dice=2.)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.LR)
     # min_test_loss = 1e5
@@ -103,7 +85,7 @@ def main(args):
         model.eval()
         criterion.eval()
         cumulative_loss = 0.0
-        
+
         sensitivity = torch.zeros(args.n_class).to(device)
         sensitivity_cnt = torch.zeros(args.n_class).to(device)
 
@@ -124,7 +106,7 @@ def main(args):
 
                 sensitivity += ((tp) / (tp_fn + epsilon)).sum(dim=0)
                 sensitivity_cnt += (tp_fn != 0).sum(dim=0)
-            
+
             sensitivity /= sensitivity_cnt
             print(sensitivity[:-1])
 

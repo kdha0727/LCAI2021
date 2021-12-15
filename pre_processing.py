@@ -7,7 +7,7 @@ from xml.etree import ElementTree
 import argparse
 import sys
 
-from constants import channel_map
+from constants import channel_map, img_height, img_width
 
 
 def parse_arguments(argv):
@@ -16,31 +16,16 @@ def parse_arguments(argv):
                         default="raw_data", help='path to the root folder')
     parser.add_argument('--destination_folder', type=str,
                         default="processed_data", help='destination folder')
-    parser.add_argument('--test', action='store_true',
-                        help='whether trnsform is test')
-
-    parser.add_argument('--img_height', type=int, default=512,
-                        help='height of the result images')
-    parser.add_argument('--img_width', type=int, default=768,
-                        help='width of the result images')
     return parser.parse_args(argv)
 
 
-# root_folder="raw_data"
-# destination_folder="processed_data"
-
-def main(args):
-    root_folder = os.path.expanduser(args.root_folder)
-    destination_folder = os.path.expanduser(args.destination_folder)
-    img_height = args.img_height
-    img_width = args.img_width
-    test_mode = args.test
+def process_case(src, dst, test):
 
     files = []
-    if not os.path.exists(destination_folder):
-        os.makedirs(destination_folder)
+    if not os.path.exists(dst):
+        os.makedirs(dst)
 
-    for file in os.listdir(root_folder):
+    for file in os.listdir(src):
         extension = file.split(".")[-1]
         if extension != 'xml':
             files.append(file)
@@ -49,19 +34,19 @@ def main(args):
         # extension = file.split(".")[-1]
         filename = file.split(".")[0]
         print(file)
-        if not os.path.exists(destination_folder + "/image"):
-            os.makedirs(destination_folder + "/image")
+        if not os.path.exists(dst + "/image"):
+            os.makedirs(dst + "/image")
 
-        img_real = Image.open(root_folder + "/" + file)
+        img_real = Image.open(os.path.join(src, file))
         img_real.load()
         width, height = img_real.size
 
-        if not test_mode:
-            if not os.path.exists(destination_folder + "/mask"):
-                os.makedirs(destination_folder + "/mask")
-            if not os.path.exists(destination_folder + "/mask_visualization"):
-                os.makedirs(destination_folder + "/mask_visualization")
-            tree = ElementTree.parse(root_folder + '/' + filename + ".xml")
+        if not test:
+            if not os.path.exists(dst + "/mask"):
+                os.makedirs(dst + "/mask")
+            if not os.path.exists(dst + "/mask_visualization"):
+                os.makedirs(dst + "/mask_visualization")
+            tree = ElementTree.parse(src + '/' + filename + ".xml")
             root = tree.getroot()
             root_size = root.findall("size")
 
@@ -98,14 +83,24 @@ def main(args):
                         mask[:, :, channel][mask[:, :, channel] == cur_mask] = 0
                 cv2.fillPoly(mask_visualization, [np.asarray(r)], clr, cv2.LINE_AA)
 
-            np.save(destination_folder + "/mask/" + filename + ".npy", cv2.resize(mask, (img_width, img_height)))
+            np.save(dst + "/mask/" + filename + ".npy", cv2.resize(mask, (img_width, img_height)))
             Image.fromarray(cv2.resize(mask_visualization, (img_width, img_height))).save(
-                destination_folder + "/mask_visualization/" + filename + ".png", format="png")
+                dst + "/mask_visualization/" + filename + ".png", format="png")
 
         small_img_real = cv2.resize(np.asarray(img_real), (img_width, img_height))  # noqa
 
         Image.fromarray(small_img_real).save(
-            destination_folder + "/image/" + filename + ".png", format="png")
+            dst + "/image/" + filename + ".png", format="png")
+
+
+def main(args):
+
+    root_folder = os.path.expanduser(args.root_folder)
+    destination_folder = os.path.expanduser(args.destination_folder)
+    targets = ['/train_set/normal', '/train_set/benign_tumor', '/train_set/cancer', '/test_set_for_LCAI']
+    tests = [False, False, False, True]
+    for target, test in zip(targets, tests):
+        process_case(root_folder + target, destination_folder + target, test)
 
 
 if __name__ == "__main__":
