@@ -1,26 +1,29 @@
 import os
 import argparse
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import sys
 # from model import ResNetUNet
 from monai.networks.nets import UNet
+from monai.losses import DiceCELoss, DiceLoss
 
 from dataset import TrainDataset, TestDataset, test_transform
 from model.losses import BCEDiceIoUWithLogitsLoss2d
+from model.functional import convert_by_one_hot_nd
 
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default="train_set/", help='path to the train data folder')
     parser.add_argument('--mode', type=str, default='train', help='mode')
-    parser.add_argument('--batch_size', type=int, default=24, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=48, help='batch size')
     parser.add_argument('--epoch', type=int, default=500, help='no. of epoch')
     # parser.add_argument('--LR', type=float, default=0.00001, help='learning rate')
     parser.add_argument('--LR', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--n_channel', type=int, default=3, help='input channel')
-    parser.add_argument('--img_height', type=int, default=256, help='image height')
-    parser.add_argument('--img_width', type=int, default=384, help='image width')
+    parser.add_argument('--img_height', type=int, default=512, help='image height')
+    parser.add_argument('--img_width', type=int, default=768, help='image width')
     parser.add_argument('--n_class', type=int, default=8, help='output classes')
     parser.add_argument('--split_ratio', type=float, default=0.8, help='train/val split ratio')
     parser.add_argument('--num_workers', type=int, default=12, help='number of data loader workers')
@@ -63,12 +66,16 @@ def main(args):
     # dataset = TestDataset(args.data_path, input_shape)
 
     model = UNet(spatial_dims=2, in_channels=args.n_channel, out_channels=args.n_class,
-                 channels=(4, 8, 16, 32, 64), strides=(2, 2, 2, 2), num_res_units=2)
-    criterion = BCEDiceIoUWithLogitsLoss2d()
+                 channels=(16, 32, 64, 128, 256), strides=(2, 2, 2, 2), num_res_units=2)
+    # criterion = BCEDiceIoUWithLogitsLoss2d()
+    criterion = DiceCELoss(include_background=True, softmax=True,
+        lambda_dice=2.
+    )
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.LR)
     # min_test_loss = 1e5
     min_test_loss = float('inf')
+    epsilon = 1e-7
 
     print("starting training in", device)
     for j in range(args.epoch):
@@ -96,19 +103,34 @@ def main(args):
         model.eval()
         criterion.eval()
         cumulative_loss = 0.0
-        for i, (input, mask, _) in enumerate(test_loader):
-            input = input.to(device)
-            mask = mask.to(device).float()
-            optimizer.zero_grad()
+        
+        sensitivity = torch.zeros(args.n_class).to(device)
+        sensitivity_cnt = torch.zeros(args.n_class).to(device)
 
-            outputs = model(input)
+        with torch.no_grad():
+            for i, (input, mask, labels) in enumerate(test_loader):
+                input = input.to(device)
+                mask = mask.to(device).float()
+                optimizer.zero_grad()
 
-            loss_test = criterion(outputs, mask)
-            cumulative_loss += loss_test.item()
+                outputs = model(input)
 
-        avg_loss = cumulative_loss / len(test_loader)
+                loss_test = criterion(outputs, mask)
+                cumulative_loss += loss_test.item()
+                outputs = convert_by_one_hot_nd(outputs, nd=2)
+                # outputs = outputs.softmax(dim=-3)
+                tp = (outputs * mask).sum(dim=(-2, -1))
+                tp_fn = mask.sum(dim=(-2, -1))
 
-        print('Average test loss after %d epoch is %f ' % ((j + 1, avg_loss)))
+                sensitivity += ((tp) / (tp_fn + epsilon)).sum(dim=0)
+                sensitivity_cnt += (tp_fn != 0).sum(dim=0)
+            
+            sensitivity /= sensitivity_cnt
+            print(sensitivity[:-1])
+
+            avg_loss = cumulative_loss / len(test_loader)
+
+            print('Average test loss after %d epoch is %f ' % ((j + 1, avg_loss)))
 
         if avg_loss < min_test_loss:
             if os.path.exists('model-laryngeal1_' + str(min_test_loss) + '.pth.tar'):

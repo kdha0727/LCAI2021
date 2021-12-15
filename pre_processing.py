@@ -7,21 +7,7 @@ from xml.etree import ElementTree
 import argparse
 import sys
 
-
-# BT: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255), (255, 0, 255)}
-# CA: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255), (255, 0, 0)}  # (56, 142, 60)?
-# NO: {(255, 255, 0), (0, 255, 255), (64, 0, 255), (64, 255, 0), (0, 128, 255)}
-
-channel_map = {
-    (255, 255, 0):     0,  # common
-    (0, 255, 255):     1,  # common
-    (64, 0, 255):      2,  # common
-    (64, 255, 0):      3,  # common
-    (0, 128, 255):     4,  # common
-    (255, 0, 255):     5,  # benign_tumor
-    (255, 0, 0):       6,  # cancer
-    (56, 142, 60):     0,  # ????? - cancer/UH0001_CD18_AAAA0016_Laryn_LC_000023_0001
-}
+from constants import channel_map
 
 
 def parse_arguments(argv):
@@ -33,9 +19,9 @@ def parse_arguments(argv):
     parser.add_argument('--test', action='store_true',
                         help='whether trnsform is test')
 
-    parser.add_argument('--img_height', type=int, default=256,
+    parser.add_argument('--img_height', type=int, default=512,
                         help='height of the result images')
-    parser.add_argument('--img_width', type=int, default=384,
+    parser.add_argument('--img_width', type=int, default=768,
                         help='width of the result images')
     return parser.parse_args(argv)
 
@@ -101,7 +87,11 @@ def main(args):
                 clr = ImageColor.getcolor(clr, "RGB")
                 cur_mask = np.zeros((height, width), dtype=np.uint8)
                 cur_mask = cv2.fillPoly(cur_mask, [np.asarray(r)], (1,), cv2.LINE_AA)
-                cur_channel = channel_map[clr]
+                try:
+                    cur_channel = channel_map[clr]
+                except KeyError as e:
+                    print(e)
+                    cur_channel = 0
                 mask[:, :, cur_channel] = cur_mask
                 for channel in range(7):
                     if channel != cur_channel:

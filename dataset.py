@@ -1,19 +1,15 @@
 import os
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.folder import ImageFolder
 from PIL import Image
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
+from constants import class_to_index
 
 IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
-
-class_to_index = {
-    'normal': 0,
-    'benign_tumor': 1,
-    'cancer': 2,
-}
 
 
 def train_transform(input_shape):
@@ -70,11 +66,11 @@ class TrainDataset(ImageFolder):  # train / val
                         instances.append(item)
         return instances
 
-    @staticmethod
-    def _find_classes(*args, **kwargs):
-        return list(class_to_index), class_to_index
+    def _find_classes(self, dir=None):
+        return list(self.class_to_idx), self.class_to_idx
 
-    def __init__(self, root, input_shape):
+    def __init__(self, root, input_shape, class_to_idx=class_to_index):
+        self.class_to_idx = class_to_idx
         super().__init__(root)
         self.transform = train_transform(input_shape)
 

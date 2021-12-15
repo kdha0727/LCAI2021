@@ -3,3 +3,8 @@
 nsml.py
 */.DS_Store
 data
+*.pth.tar
+.ipynb_checkpoints
+*/__pycache__/*
+__pycache__/*
+data_processed
