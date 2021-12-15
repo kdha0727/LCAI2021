@@ -67,11 +67,23 @@ class TrainDataset(ImageFolder):  # train / val
         return instances
 
     def _find_classes(self, dir=None):
+        print(1)
         return list(self.class_to_idx), self.class_to_idx
 
-    def __init__(self, root, input_shape, class_to_idx=class_to_index):
+    def __init__(self, root, input_shape, class_to_idx=class_to_index, extensions=IMG_EXTENSIONS):
+        
+        Dataset.__init__(self)
+        self.root = root
         self.class_to_idx = class_to_idx
-        super().__init__(root)
+        samples = self.make_dataset(root, class_to_idx, extensions)
+        if len(samples) == 0:
+            msg = "Found 0 files in subfolders of: {}\n".format(self.root)
+            if extensions is not None:
+                msg += "Supported extensions are: {}".format(",".join(extensions))
+            raise RuntimeError(msg)
+
+        self.class_to_idx = class_to_idx
+        self.samples = samples
         self.transform = train_transform(input_shape)
 
     def __getitem__(self, index):
