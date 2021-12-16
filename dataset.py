@@ -20,8 +20,8 @@ def train_transform(input_shape):
             A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
             A.RandomBrightnessContrast(p=0.5),
             A.Normalize(
-                mean=(130.6546339553507, 84.802248113933, 80.22214275038328),
-                std=(14.45061680166957, 14.68356058416991, 13.664813135860628)
+                # mean=(130.6546339553507, 84.802248113933, 80.22214275038328),
+                # std=(14.45061680166957, 14.68356058416991, 13.664813135860628)
             ),
             ToTensorV2(),
         ]
@@ -33,8 +33,8 @@ def test_transform(input_shape):
         [
             A.Resize(input_shape[1], input_shape[2]),
             A.Normalize(
-                mean=(130.6546339553507, 84.802248113933, 80.22214275038328),
-                std=(14.45061680166957, 14.68356058416991, 13.664813135860628)
+                # mean=(130.6546339553507, 84.802248113933, 80.22214275038328),
+                # std=(14.45061680166957, 14.68356058416991, 13.664813135860628)
             ),
             ToTensorV2(),
         ]
@@ -137,7 +137,7 @@ class TestDataset(Dataset):  # test
                 img = img.convert('RGB')
             image = np.asarray(img)  # noqa
         augmented = self.transform(image=image)
-        image = Image.fromarray(augmented['image'])
+        image = augmented['image']
         return image
 
     def __len__(self) -> int:

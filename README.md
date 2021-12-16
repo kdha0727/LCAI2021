@@ -2,34 +2,27 @@
 
 > Information for baseline code
 
+<!--
+
 ### 1. Preprocessing
 
 * xml to png mask
 
 ```bash
-$ python preprocessing.py \
---root_folder=[input_folder] \
---destination_folder=[output_folder] \
---img_height=[target_height] \ 
---img_width=[target_width]
+$ python pre_processing.py \                                 
+--root_folder "path/to/your/tar/archive" \                 
+--destination_folder "./data_processed"
 ```
 
 ![image](https://user-images.githubusercontent.com/92664643/145568215-2f51579f-7aac-41cf-9aa7-5f12e601769e.png)
-
-
-
 
 ### 2. Dataset
 
 * `ImageDataset` :   Data Loader 
 
-
-
 ### 3. Model
 
 * `ResNetUNet`  : Model Network
-
-
 
 ### 3. Pytorch_SSIM
 
@@ -50,5 +43,34 @@ $ python train.py \
 --img_width=[input_width]
 ```
 
+-->
 
+* How to Run
 
+1. install requirements
+
+```bash
+$ pip install -r requirements.txt
+```
+
+2. preprocess your files
+
+```bash
+$ python pre_processing.py \                                 
+--root_folder "path/to/your/unzipped/archive" \
+--destination_folder "./data_processed"
+```
+
+3. run test scripts
+
+**Preprocessed**
+
+```bash
+$ python test.py --data_path "./data_processed/test_set_for_LCAI"
+```
+
+**Original**
+
+```bash
+$ python test.py --data_path "path/to/your/unzipped/archive/test_set_for_LCAI"
+```

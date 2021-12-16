@@ -1,11 +1,14 @@
 __all__ = ['get_efficientnet']
 
 
-def get_efficientnet():
+def get_efficientnet(pretrained=False):
     import torch
     from efficientnet_pytorch import EfficientNet
     from efficientnet_pytorch.utils import GlobalParams
-    model = EfficientNet.from_pretrained('efficientnet-b7')
+    if pretrained:
+        model = EfficientNet.from_pretrained('efficientnet-b4')
+    else:
+        model = EfficientNet.from_name('efficientnet-b4')
     global_params = model._global_params
     override_global_params = GlobalParams(
         width_coefficient=global_params.width_coefficient,
@@ -21,4 +24,5 @@ def get_efficientnet():
         include_top=True,
     )
     model._global_params = override_global_params
-    model._fc = torch.nn.Linear(2560, 3)  # b4: 1792, b7: 2560
+    model._fc = torch.nn.Linear(1792, 3)  # b4: 1792, b7: 2560
+    return model
