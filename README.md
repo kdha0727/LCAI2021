@@ -1,5 +1,10 @@
 # LARYNX CANCER SEGMENTATION
 
+> Participants
+> * **[Dongha Kim](https://github.com/kdha0727/)**
+> * **[Jinyeong Kim](https://github.com/rubato-yeong/)**
+> 
+
 ![image](./assets/Task.png)
 
 ---
@@ -41,3 +46,5 @@ $ python test.py --data_path "path/to/your/unzipped/archive/test_set_for_LCAI"
 ## Classification Result
 
 ![confusion matrix](./assets/Confusion%20Matrix.png)
+
+---
